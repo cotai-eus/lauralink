@@ -1,0 +1,30 @@
+{
+  "rules": [
+    {
+      "id": "dev-and-prod-access",
+      "allowed": {
+        "origins": [
+          "http://localhost:5173",
+          "http://localhost:8787",
+          "https://lauralink.qzz.io"
+        ],
+        "methods": [
+          "GET",
+          "PUT",
+          "HEAD"
+        ],
+        "headers": [
+          "Content-Type",
+          "Content-MD5",
+          "x-amz-*"
+        ]
+      },
+      "expose": {
+        "headers": [
+          "ETag"
+        ]
+      },
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

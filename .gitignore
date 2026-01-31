@@ -201,3 +201,22 @@ dist
 ### React Router ###
 .react-router/
 /build/
+
+### Development environment and editors ###
+# Visual Studio Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# Local editor/session history
+.history/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Windows thumbnail cache
+Thumbs.db
+
+/docs/

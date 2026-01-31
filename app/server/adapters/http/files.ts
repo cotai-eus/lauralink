@@ -1,0 +1,204 @@
+import { Hono } from "hono";
+import { executeUploadIntent, uploadIntentSchema } from "../../core/usecases/upload-intent";
+import { executeFinalizeUpload } from "../../core/usecases/finalize-upload";
+import { executeGetFile } from "../../core/usecases/get-file";
+import { executeListFiles } from "../../core/usecases/list-files";
+import { FileRepository, UserRepository } from "../../infra/d1/repositories";
+import { createR2Presigner } from "../../infra/r2/presigner";
+import { ZodError } from "zod";
+
+// Type for Cloudflare Worker environment bindings
+interface Env {
+    DB: D1Database;
+    BUCKET: R2Bucket;
+    R2_ACCOUNT_ID: string;
+    R2_ACCESS_KEY_ID: string;
+    R2_SECRET_ACCESS_KEY: string;
+    R2_BUCKET_NAME: string;
+}
+
+// Create the Hono app for API routes
+const api = new Hono<{ Bindings: Env }>();
+
+/**
+ * Error handler helper
+ */
+function handleError(error: unknown) {
+    if (error instanceof ZodError) {
+        return {
+            error: "VALIDATION_ERROR",
+            details: error.issues,
+            status: 400,
+        };
+    }
+
+    if (error instanceof Error) {
+        const errorMap: Record<string, number> = {
+            QUOTA_EXCEEDED: 402,
+            FILE_NOT_FOUND: 404,
+            ACCESS_DENIED: 403,
+            FILE_EXPIRED: 410,
+            R2_OBJECT_NOT_FOUND: 400,
+        };
+        return {
+            error: error.message,
+            status: errorMap[error.message] || 500,
+        };
+    }
+
+    return { error: "INTERNAL_ERROR", status: 500 };
+}
+
+/**
+ * POST /api/v1/files/upload-intent
+ * 
+ * Request body: { filename, size, contentType, expiresInHours? }
+ * Response: { fileId, uploadUrl, expiresAt }
+ */
+api.post("/upload-intent", async (c) => {
+    try {
+        const body = await c.req.json();
+
+        // TODO: Extract from auth middleware when implemented
+        const userId = c.req.header("X-User-Id") || null;
+        const userPlan = "free" as const;
+        const userStorageUsed = 0;
+
+        const fileRepo = new FileRepository(c.env.DB);
+        const r2Presigner = createR2Presigner({
+            R2_ACCOUNT_ID: c.env.R2_ACCOUNT_ID,
+            R2_ACCESS_KEY_ID: c.env.R2_ACCESS_KEY_ID,
+            R2_SECRET_ACCESS_KEY: c.env.R2_SECRET_ACCESS_KEY,
+            R2_BUCKET_NAME: c.env.R2_BUCKET_NAME,
+        });
+
+        const result = await executeUploadIntent(
+            body,
+            { userId, userPlan, userStorageUsed },
+            { fileRepo, r2Presigner }
+        );
+
+        console.log("[DEBUG] Upload intent result:", {
+            fileId: result.fileId,
+            uploadUrl: result.uploadUrl,
+            uploadUrlPreview: result.uploadUrl.substring(0, 120),
+            bucketConfig: {
+                bucket: c.env.R2_BUCKET_NAME,
+                accountId: c.env.R2_ACCOUNT_ID,
+            },
+        });
+
+        return c.json(result, 200);
+    } catch (error) {
+        const { error: msg, status } = handleError(error);
+        return c.json({ error: msg }, status as 400);
+    }
+});
+
+/**
+ * POST /api/v1/files/:id/finalize
+ * 
+ * Called after client completes R2 upload.
+ * Response: { success, downloadUrl? }
+ */
+api.post("/:id/finalize", async (c) => {
+    try {
+        const fileId = c.req.param("id");
+
+        const fileRepo = new FileRepository(c.env.DB);
+        const r2Presigner = createR2Presigner({
+            R2_ACCOUNT_ID: c.env.R2_ACCOUNT_ID,
+            R2_ACCESS_KEY_ID: c.env.R2_ACCESS_KEY_ID,
+            R2_SECRET_ACCESS_KEY: c.env.R2_SECRET_ACCESS_KEY,
+            R2_BUCKET_NAME: c.env.R2_BUCKET_NAME,
+        });
+
+        const result = await executeFinalizeUpload(fileId, {
+            fileRepo,
+            r2Presigner,
+            r2Bucket: c.env.BUCKET,
+        });
+
+        if (!result.success) {
+            const status = result.error === "FILE_NOT_FOUND" ? 404 : 400;
+            return c.json({ error: result.error }, status);
+        }
+
+        return c.json(result, 200);
+    } catch (error) {
+        const { error: msg, status } = handleError(error);
+        return c.json({ error: msg }, status as 400);
+    }
+});
+
+/**
+ * GET /api/v1/files/:id
+ * 
+ * Get file metadata and download URL.
+ * Response: { file, downloadUrl } or redirect (302)
+ */
+api.get("/:id", async (c) => {
+    try {
+        const fileId = c.req.param("id");
+        const redirect = c.req.query("redirect") === "true";
+
+        const userId = c.req.header("X-User-Id") || null;
+        const ipAddress = c.req.header("CF-Connecting-IP") || null;
+        const userAgent = c.req.header("User-Agent") || null;
+        const countryCode = c.req.header("CF-IPCountry") || null;
+
+        const fileRepo = new FileRepository(c.env.DB);
+        const r2Presigner = createR2Presigner({
+            R2_ACCOUNT_ID: c.env.R2_ACCOUNT_ID,
+            R2_ACCESS_KEY_ID: c.env.R2_ACCESS_KEY_ID,
+            R2_SECRET_ACCESS_KEY: c.env.R2_SECRET_ACCESS_KEY,
+            R2_BUCKET_NAME: c.env.R2_BUCKET_NAME,
+        });
+
+        const result = await executeGetFile(
+            fileId,
+            { userId, ipAddress, userAgent, countryCode },
+            { fileRepo, r2Presigner }
+        );
+
+        if (redirect) {
+            return c.redirect(result.downloadUrl, 302);
+        }
+
+        return c.json(result, 200);
+    } catch (error) {
+        const { error: msg, status } = handleError(error);
+        return c.json({ error: msg }, status as 400);
+    }
+});
+
+/**
+ * GET /api/v1/files
+ * 
+ * List user's files (requires auth).
+ * Query params: page, pageSize
+ * Response: { files, total, page, pageSize }
+ */
+api.get("/", async (c) => {
+    try {
+        const userId = c.req.header("X-User-Id");
+
+        if (!userId) {
+            return c.json({ error: "UNAUTHORIZED" }, 401);
+        }
+
+        const page = parseInt(c.req.query("page") || "1", 10);
+        const pageSize = parseInt(c.req.query("pageSize") || "20", 10);
+
+        const fileRepo = new FileRepository(c.env.DB);
+
+        const result = await executeListFiles(userId, page, pageSize, { fileRepo });
+
+        return c.json(result, 200);
+    } catch (error) {
+        const { error: msg, status } = handleError(error);
+        return c.json({ error: msg }, status as 400);
+    }
+});
+
+export { api as filesApi };
