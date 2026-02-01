@@ -1,0 +1,15 @@
+# R2 Credentials for local development
+# To get these credentials:
+# 1. Go to Cloudflare Dashboard > R2 > Settings
+# 2. Create API token with R2 permissions
+# 3. Copy Account ID, Access Key ID, and Secret Access Key
+# 4. Paste them here
+
+# Example R2 Account ID (36 character hex string)
+R2_ACCOUNT_ID=9e82a730533b74dc38919ec60cb3ed5e
+
+# Example R2 API token Access Key ID
+R2_ACCESS_KEY_ID=your-access-key-id-here
+
+# Example R2 API token Secret Access Key
+R2_SECRET_ACCESS_KEY=your-secret-access-key-here

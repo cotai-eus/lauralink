@@ -46,7 +46,8 @@ export default function UploadPage() {
             const { fileId, uploadUrl } = await intentRes.json();
             setUploadState((prev) => ({ ...prev, status: "uploading" }));
 
-            // Step 2: Upload directly to R2
+            // Step 2: Upload file directly to Worker (which proxies to R2)
+            // This avoids CORS issues by uploading through same origin
             await new Promise<void>((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
 
@@ -61,14 +62,17 @@ export default function UploadPage() {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         resolve();
                     } else {
-                        reject(new Error(`Upload failed: ${xhr.status}`));
+                        const errorText = xhr.responseText;
+                        reject(new Error(`Upload failed: ${xhr.status} - ${errorText}`));
                     }
                 });
 
                 xhr.addEventListener("error", () => reject(new Error("Network error")));
                 xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
 
-                xhr.open("PUT", uploadUrl);
+                // Upload through Worker endpoint instead of direct to R2
+                // This avoids CORS preflight issues
+                xhr.open("PUT", `/api/v1/files/${fileId}/upload`);
                 xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
                 xhr.send(file);
             });

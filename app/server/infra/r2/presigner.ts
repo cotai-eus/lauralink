@@ -17,6 +17,17 @@ export class R2Presigner {
     private bucketName: string;
 
     constructor(config: R2PresignerConfig) {
+        // Validate configuration
+        if (!config.accountId || !config.accessKeyId || !config.secretAccessKey || !config.bucketName) {
+            throw new Error(
+                `Invalid R2 configuration: missing credentials. ` +
+                `accountId: ${config.accountId ? "present" : "missing"}, ` +
+                `accessKeyId: ${config.accessKeyId ? "present" : "missing"}, ` +
+                `secretAccessKey: ${config.secretAccessKey ? "present" : "missing"}, ` +
+                `bucketName: ${config.bucketName ? "present" : "missing"}`
+            );
+        }
+
         this.bucketName = config.bucketName;
         this.client = new S3Client({
             region: "auto",
