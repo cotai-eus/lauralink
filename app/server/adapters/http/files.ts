@@ -15,10 +15,38 @@ interface Env {
     R2_ACCESS_KEY_ID: string;
     R2_SECRET_ACCESS_KEY: string;
     R2_BUCKET_NAME: string;
+    RATE_LIMITER: DurableObjectNamespace;
+    RATE_LIMIT_UPLOADS_PER_MINUTE?: string;
+    RATE_LIMIT_DOWNLOADS_PER_MINUTE?: string;
 }
 
 // Create the Hono app for API routes
 const api = new Hono<{ Bindings: Env }>();
+
+/**
+ * Rate limiting helper using Durable Objects
+ */
+async function checkRateLimit(
+    rateLimiterNS: DurableObjectNamespace,
+    identifier: string,
+    limit: number,
+    windowSeconds: number
+): Promise<{ allowed: boolean; count: number }> {
+    try {
+        const id = rateLimiterNS.idFromName(identifier);
+        const stub = rateLimiterNS.get(id);
+        const response = await stub.fetch(new Request("https://rate-limiter/check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ limit, windowSeconds }),
+        }));
+        return await response.json();
+    } catch (error) {
+        // If rate limiter fails, allow the request (fail open)
+        console.error("[RATE_LIMITER] Error:", error);
+        return { allowed: true, count: 0 };
+    }
+}
 
 /**
  * Error handler helper
@@ -57,6 +85,21 @@ function handleError(error: unknown) {
  */
 api.post("/upload-intent", async (c) => {
     try {
+        // Rate limiting by IP
+        const ipAddress = c.req.header("CF-Connecting-IP") || c.req.header("X-Forwarded-For") || "anonymous";
+        const uploadLimit = parseInt(c.env.RATE_LIMIT_UPLOADS_PER_MINUTE || "10", 10);
+        
+        if (c.env.RATE_LIMITER) {
+            const rateCheck = await checkRateLimit(c.env.RATE_LIMITER, `upload:${ipAddress}`, uploadLimit, 60);
+            if (!rateCheck.allowed) {
+                return c.json({ 
+                    error: "RATE_LIMITED",
+                    message: `Too many uploads. Limit: ${uploadLimit} per minute. Try again later.`,
+                    retryAfter: 60
+                }, 429);
+            }
+        }
+
         const body = await c.req.json();
 
         // TODO: Extract from auth middleware when implemented
@@ -77,16 +120,6 @@ api.post("/upload-intent", async (c) => {
             { userId, userPlan, userStorageUsed },
             { fileRepo, r2Presigner }
         );
-
-        console.log("[DEBUG] Upload intent result:", {
-            fileId: result.fileId,
-            uploadUrl: result.uploadUrl,
-            uploadUrlPreview: result.uploadUrl.substring(0, 120),
-            bucketConfig: {
-                bucket: c.env.R2_BUCKET_NAME,
-                accountId: c.env.R2_ACCOUNT_ID,
-            },
-        });
 
         return c.json(result, 200);
     } catch (error) {

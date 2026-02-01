@@ -4,18 +4,20 @@ import { FileRepository } from "../../infra/d1/repositories";
 import { R2Presigner } from "../../infra/r2/presigner";
 
 // Zod schema for input validation
+// Max file size: 20MB (Cloudflare Free tier optimized)
 export const uploadIntentSchema = z.object({
     filename: z.string().min(1).max(255),
-    size: z.number().positive().max(5 * 1024 * 1024 * 1024), // 5GB max
+    size: z.number().positive().max(20 * 1024 * 1024), // 20MB max
     contentType: z.string().min(1),
     expiresInHours: z.number().positive().optional(),
 });
 
 // Plan limits (storage in bytes)
+// Cloudflare R2 Free: 10GB total, so limits adjusted accordingly
 const PLAN_LIMITS = {
-    free: 1 * 1024 * 1024 * 1024, // 1GB
-    pro: 100 * 1024 * 1024 * 1024, // 100GB
-    enterprise: 1024 * 1024 * 1024 * 1024, // 1TB
+    free: 500 * 1024 * 1024, // 500MB per user (free tier)
+    pro: 5 * 1024 * 1024 * 1024, // 5GB per user
+    enterprise: 10 * 1024 * 1024 * 1024, // 10GB per user (R2 free limit)
 };
 
 export interface UploadIntentDeps {

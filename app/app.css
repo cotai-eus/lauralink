@@ -14,3 +14,76 @@ body {
 		color-scheme: dark;
 	}
 }
+
+/* Animations */
+@keyframes slideIn {
+	from {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.animate-slideIn {
+	animation: slideIn 0.3s ease-out;
+}
+
+.animate-fadeIn {
+	animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Light mode support */
+html.light {
+	--tw-gradient-from: #f8fafc;
+	--tw-gradient-to: #e0e7ff;
+}
+
+html.light body {
+	background: linear-gradient(to bottom right, #f8fafc, #e0e7ff, #f8fafc);
+}
+
+html.light .bg-gray-800\/50 {
+	background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+html.light .bg-gray-900\/50 {
+	background-color: rgba(241, 245, 249, 0.7) !important;
+}
+
+html.light .text-white {
+	color: #1e293b !important;
+}
+
+html.light .text-gray-300 {
+	color: #475569 !important;
+}
+
+html.light .text-gray-400 {
+	color: #64748b !important;
+}
+
+html.light .text-gray-500 {
+	color: #94a3b8 !important;
+}
+
+html.light .border-gray-700 {
+	border-color: #cbd5e1 !important;
+}
+
+html.light .border-gray-600 {
+	border-color: #e2e8f0 !important;
+}

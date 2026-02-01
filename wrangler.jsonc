@@ -13,9 +13,11 @@
 	"vars": {
 		"VALUE_FROM_CLOUDFLARE": "Lauralink",
 		"FILE_EXPIRY_DAYS": "30",
-		"MAX_FILE_SIZE_MB": "5000",
+		"MAX_FILE_SIZE_MB": "20",
 		"R2_BUCKET_NAME": "lauralink",
-		"TURNSTILE_SITE_KEY": "0x4AAAAAACUEhgYrhTarNGVk"
+		"TURNSTILE_SITE_KEY": "0x4AAAAAACUEhgYrhTarNGVk",
+		"RATE_LIMIT_UPLOADS_PER_MINUTE": "10",
+		"RATE_LIMIT_DOWNLOADS_PER_MINUTE": "60"
 	},
 	"observability": {
 		"enabled": true
