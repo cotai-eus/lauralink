@@ -59,6 +59,34 @@ Perfeito! Agora tenho uma visão completa. Vou criar uma descrição detalhada d
 ## 📱 Descrição Completa do Lauralink
 
 **Lauralink** é uma aplicação SaaS moderna para compartilhamento seguro de arquivos, construída como um full-stack completo rodando nos **Cloudflare Workers** (edge computing).
+ 
+## 🚀 Quickstart (rápido)
+
+- Pré-requisitos: `node >= 18`, `npm` ou `pnpm`, `wrangler` instalado e credenciais Cloudflare configuradas.
+- Instalação:
+
+```bash
+npm ci
+```
+
+- Rodando localmente em modo dev (frontend + worker):
+
+```bash
+npm run dev
+# abre http://localhost:5173
+```
+
+- Rodando testes unitários e de integração locais (Miniflare + Vitest):
+
+```bash
+npx miniflare -c miniflare.config.mjs --quiet &
+npx vitest
+```
+
+- Links importantes:
+   - Documentação de capacidades: [SKILLS.md](SKILLS.md)
+   - Protocolos e agentes: [AGENTS.md](AGENTS.md)
+
 
 ---
 
@@ -291,6 +319,27 @@ TURNSTILE_SITE_KEY: Cloudflare Bot Management (não usado ainda)
 - **Responsivo:** Mobile-first
 - **Ícones dinâmicos** por tipo de arquivo
 - **Icons:** React Router integrado, sem bibliotecas externas
+ 
+---
+
+## 🧪 Testes & CI
+
+- Estratégia recomendada: testes unitários (`vitest`) + testes de integração executados em Miniflare para simular bindings (D1, R2, DO).
+- Jobs de CI sugeridos (ordem): `install` → `typecheck` → `lint` → `test:unit` → `test:integration` (Miniflare) → `sast` → `secret-scan` → `deploy`.
+- Comandos úteis para runners/locais:
+
+```bash
+npm ci
+npm run lint
+npx miniflare -c miniflare.config.mjs --quiet &
+npx vitest run --run
+```
+
+## 📈 Observability & Segurança (resumo)
+
+- Observability: exponha métricas (Prometheus) e logs estruturados (JSON) que incluam `trace_id` para correlacionar fluxos entre upload-intent → finalize → DOs.
+- Segurança: mantenha secrets em Vault ou Cloudflare Secrets; imponha SAST e secret-scan (trufflehog/detect-secrets) no CI; use pre-commit hooks para bloquear commits com credenciais.
+- Resiliência: endpoints mutacionais devem aceitar `Idempotency-Key`; adotar retry exponencial com jitter; usar DLQ e checkpoints para reprocessamento de mensagens.
 
 ---
 
