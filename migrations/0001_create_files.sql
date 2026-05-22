@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS files (
+	id TEXT PRIMARY KEY,
+	original_name TEXT NOT NULL,
+	content_type TEXT NOT NULL,
+	size_bytes INTEGER NOT NULL,
+	r2_key TEXT NOT NULL UNIQUE,
+	uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
