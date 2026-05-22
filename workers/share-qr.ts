@@ -1,4 +1,4 @@
-import QRCode from "qrcode/lib/browser.js";
+import QRCode from "qrcode";
 
 export async function renderShareQrSvg(shareUrl: string): Promise<string> {
 	return QRCode.toString(shareUrl, {

@@ -201,3 +201,7 @@ dist
 ### React Router ###
 .react-router/
 /build/
+
+
+### Other ###
+cloudflare-sec.csv
