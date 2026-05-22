@@ -9,7 +9,6 @@ import {
 	type ShareMetadata,
 	type UploadResponse,
 } from "../app/lib/files";
-import { renderShareQrSvg } from "./share-qr";
 import { createPasswordDigest, verifyPasswordDigest } from "./share-security";
 import {
 	commitUnlockedShareSession,
@@ -103,7 +102,7 @@ apiApp.post("/upload", async (c) => {
 			throw error;
 		}
 
-		const shareMetadata = await toShareMetadata(
+		const shareMetadata = toShareMetadata(
 			{
 				share: {
 					id: shareId,
@@ -157,9 +156,7 @@ apiApp.get("/shares/:id", async (c) => {
 
 		const isUnlocked = await resolveShareUnlockState(c.req.raw, c.env, shareBundle.share);
 
-		return c.json(
-			await toShareMetadata(shareBundle, new URL(c.req.url).origin, isUnlocked),
-		);
+		return c.json(toShareMetadata(shareBundle, new URL(c.req.url).origin, isUnlocked));
 	} catch (error) {
 		return handleApiError(c, error, "share_lookup_failed");
 	}
@@ -361,8 +358,6 @@ async function persistShare(
 		files: PreparedUpload[];
 	},
 ): Promise<void> {
-	await ensureShareSchema(db);
-
 	await db.batch([
 		db.prepare(
 			`
@@ -416,8 +411,6 @@ async function persistShare(
 }
 
 async function reserveShareId(db: D1Database): Promise<string> {
-	await ensureShareSchema(db);
-
 	for (let attempt = 0; attempt < 5; attempt += 1) {
 		const candidate = generateId(10);
 		const existing = await db
@@ -445,8 +438,6 @@ async function findShareWithFiles(
 	db: D1Database,
 	id: string,
 ): Promise<ShareWithFiles | null> {
-	await ensureShareSchema(db);
-
 	const share = await db
 		.prepare(
 			`
@@ -495,17 +486,16 @@ async function findShareWithFiles(
 	};
 }
 
-async function toShareMetadata(
+function toShareMetadata(
 	shareBundle: ShareWithFiles,
 	origin: string,
 	isUnlocked: boolean,
-): Promise<ShareMetadata> {
+): ShareMetadata {
 	const shareUrl = `${origin}/f/${shareBundle.share.id}`;
 
 	return {
 		id: shareBundle.share.id,
 		shareUrl,
-		qrSvg: await renderShareQrSvg(shareUrl),
 		totalSizeBytes: shareBundle.share.total_size_bytes,
 		fileCount: shareBundle.share.file_count,
 		createdAt: shareBundle.share.created_at,
@@ -613,44 +603,7 @@ async function streamShareFile(c: ApiContext, shareId: string, file: ShareFileRo
 }
 
 async function deleteShare(db: D1Database, shareId: string): Promise<void> {
-	await ensureShareSchema(db);
-
 	await db.prepare("DELETE FROM shares WHERE id = ?").bind(shareId).run();
-}
-
-async function ensureShareSchema(db: D1Database): Promise<void> {
-	await db.batch([
-		db.prepare(
-			`CREATE TABLE IF NOT EXISTS shares (
-				id TEXT PRIMARY KEY,
-				total_size_bytes INTEGER NOT NULL,
-				file_count INTEGER NOT NULL,
-				password_salt TEXT,
-				password_hash TEXT,
-				password_iterations INTEGER,
-				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-			) STRICT`,
-		),
-		db.prepare(
-			`CREATE TABLE IF NOT EXISTS share_files (
-				id TEXT PRIMARY KEY,
-				share_id TEXT NOT NULL,
-				original_name TEXT NOT NULL,
-				content_type TEXT NOT NULL,
-				size_bytes INTEGER NOT NULL,
-				r2_key TEXT NOT NULL UNIQUE,
-				sort_order INTEGER NOT NULL,
-				created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-				FOREIGN KEY (share_id) REFERENCES shares(id) ON DELETE CASCADE
-			) STRICT`,
-		),
-		db.prepare(
-			"CREATE INDEX IF NOT EXISTS idx_share_files_share_id_sort_order ON share_files (share_id, sort_order)",
-		),
-		db.prepare(
-			"CREATE INDEX IF NOT EXISTS idx_share_files_r2_key ON share_files (r2_key)",
-		),
-	]);
 }
 
 function buildAttachmentDisposition(fileName: string): string {

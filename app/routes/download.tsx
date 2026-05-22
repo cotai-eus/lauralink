@@ -5,6 +5,7 @@ import {
 	forwardInternalCookies,
 	toCloudflareContext,
 } from "../.server/lauralink-api";
+import { ShareQr } from "../components/share-qr";
 import { formatBytes, type ShareMetadata } from "../lib/files";
 import type { Route } from "./+types/download";
 
@@ -245,10 +246,9 @@ export default function Download({
 							<p className="text-sm font-bold uppercase tracking-[0.25em]">
 								QR code
 							</p>
-							<div
-								aria-label="QR code do share"
+							<ShareQr
 								className="mt-4 mx-auto max-w-[220px]"
-								dangerouslySetInnerHTML={{ __html: loaderData.qrSvg }}
+								shareUrl={loaderData.shareUrl}
 							/>
 						</section>
 

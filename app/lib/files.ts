@@ -15,7 +15,6 @@ export type ShareFileSummary = {
 export type ShareMetadata = {
 	id: string;
 	shareUrl: string;
-	qrSvg: string;
 	totalSizeBytes: number;
 	fileCount: number;
 	createdAt: string;

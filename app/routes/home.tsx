@@ -6,6 +6,7 @@ import {
 	forwardInternalCookies,
 	toCloudflareContext,
 } from "../.server/lauralink-api";
+import { ShareQr } from "../components/share-qr";
 import {
 	formatBytes,
 	MAX_FILES_PER_SHARE,
@@ -337,12 +338,9 @@ export default function Home({ actionData }: Route.ComponentProps) {
 									</div>
 
 									<div className="brutal-card bg-white p-4">
-										<div
-											aria-label="QR code do share"
+										<ShareQr
 											className="mx-auto max-w-[220px]"
-											dangerouslySetInnerHTML={{
-												__html: actionData.upload.share.qrSvg,
-											}}
+											shareUrl={actionData.upload.share.shareUrl}
 										/>
 									</div>
 
